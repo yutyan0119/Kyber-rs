@@ -1,16 +1,19 @@
+use crate::params::*;
+
 pub const SHA_512_RATE: usize = 72; // 1600[f size bit] - (512*2)[capacity bit] = 576 = 72*8 [bit]
 pub const SHA_256_RATE: usize = 136; // 1600[f size bit] - (256*2)[capacity bit] = 1088 = 136*8 [bit]
 pub const SHAKE_128_RATE: usize = 168; // 1600[f size bit] - (128*2)[capacity bit] = 1344 = 168*8 [bit]
+pub const SHAKE_256_RATE: usize = 136; // 1600[f size bit] - (256*2)[capacity bit] = 1088 = 136*8 [bit]
 
 #[derive(Copy, Clone)]
-pub struct KeccackState {
+pub struct KeccakState {
     pub state: [u64; 25],
     pub pos: usize,
 }
 
-impl KeccackState {
+impl KeccakState {
     pub fn new() -> Self {
-        KeccackState {
+        KeccakState {
             state: [0; 25],
             pos: 0,
         }
@@ -40,7 +43,7 @@ pub fn sha3_256(out: &mut [u8; 32], input: &[u8], len: usize) {
     }
 }
 
-pub fn kyber_shake128_absorb(state: &mut KeccackState, input: &[u8], x: u8, y: u8) {
+pub fn kyber_shake128_absorb(state: &mut KeccakState, input: &[u8], x: u8, y: u8) {
     let mut seed: [u8; 34] = [0u8; 32 + 2];
     seed[..32].copy_from_slice(input);
     seed[32] = x;
@@ -48,25 +51,81 @@ pub fn kyber_shake128_absorb(state: &mut KeccackState, input: &[u8], x: u8, y: u
     shake128_absorb_once(state, &seed, 34 as usize);
 }
 
-pub fn shake128_absorb_once(state: &mut KeccackState, input: &[u8], len: usize) {
+pub fn shake128_absorb_once(state: &mut KeccakState, input: &[u8], len: usize) {
     keccak_absorb_once(&mut state.state, SHAKE_128_RATE, input, len, 0x1F);
     state.pos = SHAKE_128_RATE;
 }
 
-pub fn kyber_shake128_squeezeblocks(output: &mut [u8], nblocks: usize, state: &mut KeccackState) {
+pub fn kyber_shake128_squeezeblocks(output: &mut [u8], nblocks: usize, state: &mut KeccakState) {
     keccak_squeezeblocks(output, nblocks, &mut state.state, SHAKE_128_RATE);
 }
 
-pub fn keccak_squeezeblocks(output: &mut [u8],mut nblocks: usize, state: &mut [u64], rate: usize) {
+pub fn kyber_shake256_prf(out: &mut [u8], outlen: usize, seed: &[u8], nonce: u8) {
+    let mut input = [0u8; KYBER_SYMBYTES + 1];
+    input[..KYBER_SYMBYTES].copy_from_slice(seed);
+    input[KYBER_SYMBYTES] = nonce;
+    shake256(out, outlen, &input, KYBER_SYMBYTES + 1);
+}
+
+fn shake256(out: &mut [u8], mut outlen: usize, input: &[u8], inlen: usize) {
+    let mut state = KeccakState::new();
+    let mut idx = 0;
+    shake256_absorb_once(&mut state, input, inlen);
+    let nblocks = outlen / SHAKE_256_RATE;
+    shake256_sqeezeblocks(&mut out[idx..], nblocks, &mut state);
+    outlen -= nblocks * SHAKE_256_RATE;
+    idx += nblocks * SHAKE_256_RATE;
+    shake256_squeeze(&mut out[idx..], outlen, &mut state);
+}
+
+fn shake256_absorb_once(state: &mut KeccakState, input: &[u8], len: usize) {
+    keccak_absorb_once(&mut state.state, SHAKE_256_RATE, input, len, 0x1F);
+    state.pos = SHAKE_256_RATE;
+}
+
+fn shake256_sqeezeblocks(output: &mut [u8], nblocks: usize, state: &mut KeccakState) {
+    keccak_squeezeblocks(output, nblocks, &mut state.state, SHAKE_256_RATE);
+}
+
+fn shake256_squeeze(output: &mut [u8], outlen: usize, state: &mut KeccakState) {
+    state.pos = keccak_squeeze(output, outlen, &mut state.state, state.pos, SHAKE_256_RATE);
+}
+
+pub fn keccak_squeezeblocks(output: &mut [u8], mut nblocks: usize, state: &mut [u64], rate: usize) {
     let mut idx: usize = 0;
     while nblocks > 0 {
         keccak_f1600(state);
-        for i in 0..rate/8 {
-            output[idx..idx+8].copy_from_slice(&state[i].to_le_bytes());
+        for i in 0..rate / 8 {
+            output[idx..idx + 8].copy_from_slice(&state[i].to_le_bytes());
             idx += 8;
         }
         nblocks -= 1;
     }
+}
+
+fn keccak_squeeze(
+    out: &mut [u8],
+    mut outlen: usize,
+    state: &mut [u64],
+    mut pos: usize,
+    rate: usize,
+) -> usize {
+    let mut idx = 0;
+    while outlen > 0 {
+        if pos == rate {
+            keccak_f1600(state);
+            pos = 0
+        }
+        let mut i = pos;
+        while i < rate && i < pos + outlen {
+            out[idx] = (state[i / 8] >> 8 * (i % 8)) as u8;
+            i += 1;
+            idx += 1;
+        }
+        outlen -= i - pos;
+        pos = i;
+    }
+    pos
 }
 
 fn rotl64(x: u64, offset: usize) -> u64 {
