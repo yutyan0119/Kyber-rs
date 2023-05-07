@@ -10,3 +10,4 @@ rand_core = "0.6.4"
 
 [dev-dependencies]
 hex = "0.4.3"
+rand = "0.8.5"

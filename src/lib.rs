@@ -16,10 +16,16 @@ pub fn add(left: usize, right: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand;
 
     #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+    fn test_keygen(){
+        let mut rng = rand::thread_rng();
+        let mut pk = [0u8; params::KYBER_PUBLICKEYBYTES];
+        let mut sk = [0u8; params::KYBER_SECRETKEYBYTES];
+
+        indcpa::indcpa_keypair(&mut pk, &mut sk, None, &mut rng);
+        println!("pk: {:?}", pk);
+        println!("sk: {:?}", sk);
     }
 }
