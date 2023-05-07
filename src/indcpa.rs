@@ -32,7 +32,7 @@ fn gen_matrix(a: &mut [Polyvec], seed: &[u8], transposed: bool) {
     const XOF_BLOCKBYTES: usize = SHAKE_128_RATE;
     const GEN_MATRIX_NBLOCKS: usize =
         (12 * KYBER_N / 8 * (1 << 12) / KYBER_Q as usize + XOF_BLOCKBYTES) / XOF_BLOCKBYTES;
-    let mut buf = [0u8; GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2]; //TODO:長さどうなってるか確認する
+    let mut buf: [u8; 506] = [0u8; GEN_MATRIX_NBLOCKS * XOF_BLOCKBYTES + 2]; //TODO:長さどうなってるか確認する
     let mut offset: usize;
     let mut buflen: usize;
     let mut ctr: usize;
@@ -70,13 +70,13 @@ pub fn indcpa_keypair<R>(
 ) where
     R: CryptoRng + RngCore,
 {
-    let mut a = [Polyvec::new(); KYBER_K]; //多項式ベクトル
-    let mut e = Polyvec::new(); //errorベクトル
-    let mut pkpv = Polyvec::new(); //公開鍵ベクトル
-    let mut skpv = Polyvec::new(); //秘密鍵ベクトル
-    let mut nonce = 0u8; //nonce N
-    let mut seed_buf = [0u8; 2 * KYBER_SYMBYTES]; //2つのseedを入れておくバッファ
-    let mut randbuf = [0u8; 2 * KYBER_SYMBYTES]; //seed生成に使う乱数バッファ
+    let mut a: [Polyvec; KYBER_K] = [Polyvec::new(); KYBER_K]; //多項式ベクトル
+    let mut e: Polyvec = Polyvec::new(); //errorベクトル
+    let mut pkpv: Polyvec = Polyvec::new(); //公開鍵ベクトル
+    let mut skpv: Polyvec = Polyvec::new(); //秘密鍵ベクトル
+    let mut nonce: u8 = 0u8; //nonce N
+    let mut seed_buf: [u8; 2 * KYBER_SYMBYTES] = [0u8; 2 * KYBER_SYMBYTES]; //2つのseedを入れておくバッファ
+    let mut randbuf: [u8; 2 * KYBER_SYMBYTES] = [0u8; 2 * KYBER_SYMBYTES]; //seed生成に使う乱数バッファ
 
     if let Some(s) = seed {
         randbuf[..KYBER_SYMBYTES].copy_from_slice(&s.0);
